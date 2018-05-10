@@ -83,4 +83,10 @@ class ControllerBase
     }
     $this->entityManager->flush();
   }
+
+  // The cookie name of the token for a given session
+  protected function tokenKey($id)
+  {
+    return 'session-token-' . $id;
+  }
 }

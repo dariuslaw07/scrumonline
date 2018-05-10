@@ -17,6 +17,9 @@ class Session
     /** @Column(type="string", nullable=true) **/
     protected $password;
 
+    /** @Column(type="string") **/
+    protected $token;
+
     /** @Column(type="integer") **/ 
     protected $cardSet;
   
@@ -65,6 +68,16 @@ class Session
     public function setPassword($password)
     {
         $this->password = $password;
+    }
+
+    // Getter and setter for the token field
+    public function getToken()
+    {
+        return $this->token;
+    }
+    public function setToken($token)
+    {
+        $this->token = $token;
     }
 
     // Getter and setter for cardSet field
