@@ -36,15 +36,14 @@ class SessionController extends ControllerBase
       $session->setPassword($this->createHash($data["password"]));
 
     // Generate the access token and assign it to the session
-    $token = bin2hex(random_bytes(16));
+    $token = bin2hex(random_bytes(8));
     $session->setToken($token);
       
     $session->setLastAction(new DateTime());
 
     $this->save($session);
     
-    $tokenKey = $this->tokenKey($session->getId());
-    setcookie($tokenKey, $token, time()+60*60*24*30);
+    $this->setCookie($session);
     
     return new NumericResponse($session->getId());
   }
@@ -55,9 +54,8 @@ class SessionController extends ControllerBase
   {
     $method = $_SERVER['REQUEST_METHOD'];
     if ($method == "PUT")
-    { 
-      $data = $this->jsonInput();        
-      return $this->addMember($sessionId, $data["name"]);
+    {           
+      return $this->addMember($sessionId);
     }
     if ($method == "DELETE")
     {
@@ -66,9 +64,27 @@ class SessionController extends ControllerBase
   }
   
   // Add a member with this name to the session
-  private function addMember($id, $name)
+  private function addMember($id)
   {   
+    $data = $this->jsonInput();
+    $name = $data["name"];
+    
     $session = $this->getSession($id);
+    $token = $session->getToken();
+    $tokenKey = $this->tokenKey($session->getId());
+
+    // Check if token was passed
+    if(isset($_GET["token"]) && $_GET["token"] == $token) {
+      $this->setCookie($session);
+    // Or the password
+    } else if(isset($data["password"]) && $session->getPassword() === $this->createHash($data["password"])) {
+      $this->setCookie($session);
+    // Or the user already has the token
+    } else if(isset($_COOKIE[$tokenKey]) && $_COOKIE[$tokenKey] == $token) {
+      // Do nothing and continue
+    } else {
+      return null;
+    }
     
     // Check for existing member
     foreach($session->getMembers() as $candidate)
@@ -90,10 +106,6 @@ class SessionController extends ControllerBase
         
       $this->saveAll([$member, $session]);
     }
-    
-    // Store name in cookie if not done yet
-    // if(!isset($_COOKIE['scrum_member_name']))
-    //   setcookie('scrum_member_name', $name); European privacy law
     
     $result = new stdClass();
     $result->sessionId = $id;
@@ -155,6 +167,11 @@ class SessionController extends ControllerBase
     $data = $this->jsonInput();
     $session = $this->getSession($id);
     $result = $session->getPassword() === $this->createHash($data["password"]);
+
+    // If the correct password was transmitted we also assign the token
+    if ($result)
+      $this->setCookie($session);
+
     return new BoolResponse($result);
   }
 
@@ -171,6 +188,14 @@ class SessionController extends ControllerBase
   public function cardsets()
   {
     return $this->cardSets;
+  }
+
+  // Set the token cookie for this session 
+  // with additional parameters for expiration and path
+  private function setCookie($session)
+  {
+    $tokenKey = $this->tokenKey($session->getId());
+    setcookie($tokenKey, $session->getToken(), time()+60*60*24*30, "/");
   }
 }
 
